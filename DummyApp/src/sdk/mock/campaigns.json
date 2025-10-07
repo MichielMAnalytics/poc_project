@@ -1,0 +1,34 @@
+{
+  "campaigns": [
+    {
+      "id": "welcome_popup",
+      "component": "Popup",
+      "trigger": {
+        "type": "screen_enter",
+        "screen": "Home"
+      },
+      "props": {
+        "title": "Welcome! 🎉",
+        "message": "This popup was injected dynamically by the SDK! No app release needed to change this content.",
+        "primaryButton": "Got it!",
+        "secondaryButton": "Remind me later"
+      },
+      "active": false
+    },
+    {
+      "id": "profile_announcement",
+      "component": "Popup",
+      "trigger": {
+        "type": "screen_enter",
+        "screen": "Profile"
+      },
+      "props": {
+        "title": "New Feature!!!!!✨",
+        "message": "Check out the new profile customization options. Make your profile uniquely yours!",
+        "primaryButton": "Explore Now",
+        "secondaryButton": "Later"
+      },
+      "active": false
+    }
+  ]
+}
