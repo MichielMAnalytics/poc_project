@@ -1,5 +1,7 @@
+import type {PermissionType} from './utils/permissionHandler';
+
 // Campaign type definitions
-export interface Campaign {
+export interface PopupCampaign {
   id: string;
   component: 'Popup';
   trigger: {
@@ -14,6 +16,25 @@ export interface Campaign {
   };
   active: boolean;
 }
+
+export interface PermissionPromptCampaign {
+  id: string;
+  component: 'PermissionPrompt';
+  trigger: {
+    type: 'screen_enter';
+    screen: string;
+  };
+  props: {
+    permissionType: PermissionType;
+    title: string;
+    message: string;
+    allowButton?: string;
+    denyButton?: string;
+  };
+  active: boolean;
+}
+
+export type Campaign = PopupCampaign | PermissionPromptCampaign;
 
 interface CampaignsConfig {
   campaigns: Campaign[];

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native-web';
 import HomeScreen from '@app/screens/HomeScreen';
 import ProfileScreen from '@app/screens/ProfileScreen';
 import SettingsScreen from '@app/screens/SettingsScreen';

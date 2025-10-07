@@ -79,7 +79,16 @@ Browser (shows actual app with popup)
 - ✅ Both show updated campaign within seconds
 - ✅ No app release or recompilation required
 
-### 5. **Data Flow & Single Source of Truth**
+### 5. **Permission Prompts (Remote Control)**
+- ✅ Can trigger native OS permission dialogs remotely via campaigns
+- ✅ Custom pre-permission prompt (explains why permission is needed)
+- ✅ Real OS permission dialog (iOS system alert or browser prompt)
+- ✅ Works for camera, location, notifications, photo library
+- ✅ Platform-specific handling (iOS vs Web)
+- ⚠️ **Prerequisite**: Permission must be declared in Info.plist (iOS) or supported by browser
+- ⚠️ **Limitation**: Cannot control native permission dialog styling (OS-controlled)
+
+### 6. **Data Flow & Single Source of Truth**
 - ✅ Backend API is single source of truth for campaigns
 - ✅ App configuration can be exported and shared with web preview
 - ✅ Example: `INITIAL_PARAMS` exported from `navigationConfig.ts`
@@ -352,3 +361,5 @@ Most UI renders correctly. Modal positioning has issues but campaigns are still 
 5. Add authentication and multi-tenancy support
 
 **Recommendation**: Proceed with production development. The technical foundation is solid and the approach is viable for customer deployments.
+
+

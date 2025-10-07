@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useCampaigns, Popup} from '../sdk';
+import {useCampaigns, Popup, PermissionPrompt} from '../sdk';
 
 type RootStackParamList = {
   Home: undefined;
@@ -85,8 +85,8 @@ const ProfileScreen: React.FC<Props> = ({navigation}) => {
         </View>
       </ScrollView>
 
-      {/* SDK Popup - Automatically rendered based on campaign config */}
-      {currentCampaign && (
+      {/* SDK Campaign - Automatically rendered based on campaign config */}
+      {currentCampaign && currentCampaign.component === 'Popup' && (
         <Popup
           visible={true}
           title={currentCampaign.props.title}
@@ -95,6 +95,21 @@ const ProfileScreen: React.FC<Props> = ({navigation}) => {
           secondaryButton={currentCampaign.props.secondaryButton}
           onPrimaryPress={dismissCampaign}
           onSecondaryPress={dismissCampaign}
+          onDismiss={dismissCampaign}
+        />
+      )}
+      {currentCampaign && currentCampaign.component === 'PermissionPrompt' && (
+        <PermissionPrompt
+          visible={true}
+          permissionType={currentCampaign.props.permissionType}
+          title={currentCampaign.props.title}
+          message={currentCampaign.props.message}
+          allowButton={currentCampaign.props.allowButton}
+          denyButton={currentCampaign.props.denyButton}
+          onPermissionResult={(status) => {
+            console.log(`[ProfileScreen] Permission result: ${status}`);
+            dismissCampaign();
+          }}
           onDismiss={dismissCampaign}
         />
       )}
