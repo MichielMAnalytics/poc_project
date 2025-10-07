@@ -1,4 +1,5 @@
 import type {PermissionType} from './utils/permissionHandler';
+import type {InlineComponentProps} from './components/InlineComponent';
 
 // Campaign type definitions
 export interface PopupCampaign {
@@ -34,7 +35,18 @@ export interface PermissionPromptCampaign {
   active: boolean;
 }
 
-export type Campaign = PopupCampaign | PermissionPromptCampaign;
+export interface InlineComponentCampaign {
+  id: string;
+  component: 'InlineComponent';
+  trigger: {
+    type: 'screen_enter';
+    screen: string;
+  };
+  props: InlineComponentProps;
+  active: boolean;
+}
+
+export type Campaign = PopupCampaign | PermissionPromptCampaign | InlineComponentCampaign;
 
 interface CampaignsConfig {
   campaigns: Campaign[];

@@ -14,6 +14,7 @@ export type {AppTheme} from './ThemeContext';
 
 // Campaigns
 export {useCampaigns} from './useCampaigns';
+export {useInlineComponent} from './useInlineComponent';
 export type {Campaign} from './CampaignManager';
 export {resetCampaignHistory} from './CampaignManager';
 
@@ -22,6 +23,8 @@ export {default as Popup} from './components/Popup';
 export type {PopupProps} from './components/Popup';
 export {default as PermissionPrompt} from './components/PermissionPrompt';
 export type {PermissionPromptProps} from './components/PermissionPrompt';
+export {default as InlineComponent} from './components/InlineComponent';
+export type {InlineComponentProps} from './components/InlineComponent';
 
 // Utils
 export {requestPermission, checkPermission} from './utils/permissionHandler';

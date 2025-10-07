@@ -7,7 +7,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import type {NativeStackNavigationProp, NativeStackScreenProps} from '@react-navigation/native-stack';
-import {useCampaigns, Popup} from '../sdk';
+import {useCampaigns, Popup, useInlineComponent, InlineComponent} from '../sdk';
 
 type RootStackParamList = {
   Home: {username?: string};
@@ -31,6 +31,8 @@ const HomeScreen: React.FC<Props> = ({navigation, route, username}) => {
   const displayName = route?.params?.username || username || 'Guest';
   // SDK Integration - Get campaigns for this screen
   const {currentCampaign, dismissCampaign} = useCampaigns('Home');
+  // SDK Integration - Get inline component for this screen
+  const inlineComponentProps = useInlineComponent('Home');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -39,6 +41,9 @@ const HomeScreen: React.FC<Props> = ({navigation, route, username}) => {
         <Text style={styles.subtitle}>
           Welcome to the Dummy App, {displayName}!
         </Text>
+
+        {/* PipeGuru Inline Component - Dynamically injected */}
+        {inlineComponentProps && <InlineComponent {...inlineComponentProps} />}
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
@@ -63,7 +68,7 @@ const HomeScreen: React.FC<Props> = ({navigation, route, username}) => {
       </View>
 
       {/* SDK Popup - Automatically rendered based on campaign config */}
-      {currentCampaign && (
+      {currentCampaign && currentCampaign.component === 'Popup' && (
         <Popup
           visible={true}
           title={currentCampaign.props.title}
