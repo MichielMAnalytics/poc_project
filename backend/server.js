@@ -114,6 +114,25 @@ app.put('/api/campaigns/:id', (req, res) => {
   }
 });
 
+// PATCH toggle campaign active status
+app.patch('/api/campaigns/:id/toggle', (req, res) => {
+  try {
+    const data = readCampaigns();
+    const index = data.campaigns.findIndex(c => c.id === req.params.id);
+
+    if (index === -1) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Toggle the active status
+    data.campaigns[index].active = !data.campaigns[index].active;
+    writeCampaigns(data);
+    res.json(data.campaigns[index]);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to toggle campaign' });
+  }
+});
+
 // DELETE campaign
 app.delete('/api/campaigns/:id', (req, res) => {
   try {

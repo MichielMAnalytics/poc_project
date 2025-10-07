@@ -43,6 +43,15 @@ export default function Home() {
     fetchCampaigns();
   }, []);
 
+  const handleToggle = async (id: string) => {
+    try {
+      await fetch(`${API_URL}/${id}/toggle`, { method: 'PATCH' });
+      fetchCampaigns();
+    } catch (error) {
+      console.error('Failed to toggle campaign:', error);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
 
@@ -133,18 +142,35 @@ export default function Home() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <Link
-                      href={`/campaigns/${campaign.id}/edit`}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      Edit
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(campaign.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex items-center gap-4">
+                      {/* Toggle Switch */}
+                      <button
+                        onClick={() => handleToggle(campaign.id)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          campaign.active ? 'bg-green-600' : 'bg-gray-300'
+                        }`}
+                        title={campaign.active ? 'Disable campaign' : 'Enable campaign'}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            campaign.active ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+
+                      <Link
+                        href={`/campaigns/${campaign.id}/edit`}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Edit
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(campaign.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

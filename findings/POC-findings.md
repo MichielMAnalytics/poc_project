@@ -127,6 +127,14 @@ Backend API (port 4000)
 - ❌ Deep linking not supported in web preview
 - ❌ Navigation state doesn't sync between native and web
 
+### 5. **Permission Dialog Styling Differences**
+- ❌ Custom pre-permission prompt displays consistently across platforms
+- ❌ **Native OS permission dialog styling cannot be controlled** (iOS vs Browser differences)
+- ⚠️ iOS shows system alert with iOS styling
+- ⚠️ Browser shows native browser permission prompt with browser styling
+- ⚠️ **Workaround**: Pre-permission prompt provides consistent branding before OS dialog
+- ⚠️ **Impact**: Minor visual differences acceptable - users expect platform-native dialogs
+
 ---
 
 ## Architecture Overview
