@@ -31,8 +31,6 @@ const Popup: React.FC<PopupProps> = ({
 }) => {
   const theme = defaultTheme;
 
-  console.log('[Popup] Rendering with visible:', visible, 'title:', title);
-
   if (!visible) {
     return null;
   }

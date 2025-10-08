@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {PipeGuru, Popup, PermissionPrompt} from '../sdk';
+import {CampaignRenderer} from '../sdk';
 
 type RootStackParamList = {
   Home: undefined;
@@ -26,27 +26,6 @@ type Props = {
 };
 
 const ProfileScreen: React.FC<Props> = ({navigation}) => {
-  // SDK Integration - Get current campaign (popup or permission prompt)
-  const [currentPopup, setCurrentPopup] = useState(() =>
-    PipeGuru.getPopupCampaign('Profile')
-  );
-  const [currentPermission, setCurrentPermission] = useState(() =>
-    PipeGuru.getPermissionPromptCampaign('Profile')
-  );
-
-  useEffect(() => {
-    console.log('[ProfileScreen] Setting up campaign listeners');
-    const handleUpdate = () => {
-      const popup = PipeGuru.getPopupCampaign('Profile');
-      const permission = PipeGuru.getPermissionPromptCampaign('Profile');
-      console.log('[ProfileScreen] Updated campaigns:', { popup, permission });
-      setCurrentPopup(popup);
-      setCurrentPermission(permission);
-    };
-    PipeGuru._on('campaigns_updated', handleUpdate);
-    return () => PipeGuru._off('campaigns_updated', handleUpdate);
-  }, []);
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -103,34 +82,8 @@ const ProfileScreen: React.FC<Props> = ({navigation}) => {
         </View>
       </ScrollView>
 
-      {/* SDK Campaigns */}
-      {currentPopup && (
-        <Popup
-          visible={true}
-          title={currentPopup.props.title}
-          message={currentPopup.props.message}
-          primaryButton={currentPopup.props.primaryButton}
-          secondaryButton={currentPopup.props.secondaryButton}
-          onPrimaryPress={() => setCurrentPopup(null)}
-          onSecondaryPress={() => setCurrentPopup(null)}
-          onDismiss={() => setCurrentPopup(null)}
-        />
-      )}
-      {currentPermission && (
-        <PermissionPrompt
-          visible={true}
-          permissionType={currentPermission.props.permissionType}
-          title={currentPermission.props.title}
-          message={currentPermission.props.message}
-          allowButton={currentPermission.props.allowButton}
-          denyButton={currentPermission.props.denyButton}
-          onPermissionResult={(status) => {
-            console.log(`[ProfileScreen] Permission result: ${status}`);
-            setCurrentPermission(null);
-          }}
-          onDismiss={() => setCurrentPermission(null)}
-        />
-      )}
+      {/* PipeGuru Campaigns - Auto-renders all campaign types */}
+      <CampaignRenderer screen="Profile" />
     </SafeAreaView>
   );
 };

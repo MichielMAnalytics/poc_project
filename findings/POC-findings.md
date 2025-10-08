@@ -836,6 +836,192 @@ const HomeScreen = () => {
 
 ---
 
+## Final Implementation: Simplified CampaignRenderer Pattern ⭐
+
+After testing both Provider-based hooks and imperative APIs, we arrived at the **optimal solution**: A hybrid approach using `CampaignRenderer` component.
+
+### The Problem with Manual Implementation
+
+**Before** (customers had to write this):
+```typescript
+import { PipeGuru, Popup, InlineComponent, PermissionPrompt } from '@pipeguru/react-native';
+
+const HomeScreen = () => {
+  // Manual state for each campaign type
+  const [popup, setPopup] = useState(() => PipeGuru.getPopupCampaign('Home'));
+  const [inline, setInline] = useState(() => PipeGuru.getInlineComponent('Home'));
+  const [permission, setPermission] = useState(() =>
+    PipeGuru.getPermissionPromptCampaign('Home')
+  );
+
+  // Manual event listeners (20+ lines)
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPopup(PipeGuru.getPopupCampaign('Home'));
+      setInline(PipeGuru.getInlineComponent('Home'));
+      setPermission(PipeGuru.getPermissionPromptCampaign('Home'));
+    };
+    PipeGuru._on('campaigns_updated', handleUpdate);
+    return () => PipeGuru._off('campaigns_updated', handleUpdate);
+  }, []);
+
+  // Manual rendering with conditional logic
+  return (
+    <View>
+      {inline && <InlineComponent {...inline} />}
+      {popup && <Popup visible={true} {...popup.props} onDismiss={() => setPopup(null)} />}
+      {permission && <PermissionPrompt {...} />}
+    </View>
+  );
+};
+```
+
+**Total: ~60+ lines of boilerplate per screen** ❌
+
+### The Solution: CampaignRenderer Component
+
+**After** (what customers actually write):
+```typescript
+import { CampaignRenderer } from '@pipeguru/react-native';
+
+const HomeScreen = () => {
+  return (
+    <SafeAreaView>
+      <View style={styles.content}>
+        <Text>Welcome to the App!</Text>
+
+        {/* Inline campaigns render in content flow */}
+        <CampaignRenderer screen="Home" type="inline" />
+
+        <Button title="Go to Profile" />
+      </View>
+
+      {/* Overlays render as absolute positioned */}
+      <CampaignRenderer screen="Home" type="overlay" />
+    </SafeAreaView>
+  );
+};
+```
+
+**Total: 2 lines of SDK code** ✅
+
+### How CampaignRenderer Works
+
+**Architecture:**
+```
+CampaignRenderer
+├── Manages all state internally (useState for popup, permission, inline)
+├── Sets up event listeners automatically (PipeGuru._on/off)
+├── Auto-updates when campaigns change
+└── Renders based on type prop:
+    ├── type="inline" → Renders InlineComponent only (in content flow)
+    ├── type="overlay" → Renders Popup + PermissionPrompt (absolute overlays)
+    └── no type → Renders all campaign types
+```
+
+**Implementation:**
+```typescript
+// CampaignRenderer.tsx
+export const CampaignRenderer: React.FC<{screen: string; type?: 'inline' | 'overlay'}> = ({
+  screen,
+  type,
+}) => {
+  // Auto-fetch all campaign types
+  const [popup, setPopup] = useState(() => PipeGuru.getPopupCampaign(screen));
+  const [permission, setPermission] = useState(() =>
+    PipeGuru.getPermissionPromptCampaign(screen)
+  );
+  const [inline, setInline] = useState(() => PipeGuru.getInlineComponent(screen));
+
+  // Auto-update on campaign changes
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPopup(PipeGuru.getPopupCampaign(screen));
+      setPermission(PipeGuru.getPermissionPromptCampaign(screen));
+      setInline(PipeGuru.getInlineComponent(screen));
+    };
+    PipeGuru._on('campaigns_updated', handleUpdate);
+    return () => PipeGuru._off('campaigns_updated', handleUpdate);
+  }, [screen]);
+
+  // Render based on type
+  if (type === 'inline') return <>{inline && <InlineComponent {...inline} />}</>;
+  if (type === 'overlay') return <>{/* Popup + Permission */}</>;
+  return <>{/* All campaigns */}</>;
+};
+```
+
+### Why Split Rendering? (type="inline" vs type="overlay")
+
+**The Positioning Problem:**
+- **Inline components** (promo banners) need to appear **between existing UI elements**
+  - Example: Between "Welcome" text and "Go to Profile" button
+  - Must be part of the content scroll flow
+- **Overlay components** (popups, permissions) need to appear **on top of everything**
+  - Absolutely positioned overlays
+  - Should not affect content layout
+
+**Solution:**
+```typescript
+<View style={styles.content}>
+  <Text>Welcome Message</Text>
+
+  {/* Inline campaign appears HERE in the flow */}
+  <CampaignRenderer screen="Home" type="inline" />
+
+  <Button>Go to Profile</Button>
+</View>
+
+{/* Overlays appear on top, outside content flow */}
+<CampaignRenderer screen="Home" type="overlay" />
+```
+
+### Benefits of This Approach
+
+✅ **Simple for customers**: Just 2 lines of code per screen
+✅ **Full control**: Customers decide where inline components appear
+✅ **Auto-updating**: Real-time campaign changes without code
+✅ **Type-safe**: TypeScript support for all props
+✅ **Flexible**: Can use `type` prop or render all at once
+✅ **No boilerplate**: All state/listeners hidden in component
+✅ **Industry standard**: Similar to other SDK patterns
+
+### Customer Installation (Final)
+
+**Step 1: Install**
+```bash
+npm install @pipeguru/react-native
+```
+
+**Step 2: Initialize (App.tsx)**
+```typescript
+import PipeGuru from '@pipeguru/react-native';
+
+PipeGuru.initialize('your-api-key');
+
+function App() {
+  return <AppNavigator />;
+}
+```
+
+**Step 3: Add to Screens**
+```typescript
+import { CampaignRenderer } from '@pipeguru/react-native';
+
+const HomeScreen = () => (
+  <View>
+    <Text>Content</Text>
+    <CampaignRenderer screen="Home" type="inline" />
+    <Button>Action</Button>
+    <CampaignRenderer screen="Home" type="overlay" />
+  </View>
+);
+```
+
+**That's it!** ✅
+
+---
+
 ## Technical Limitations
 
 ### 1. **Platform-Specific Code**

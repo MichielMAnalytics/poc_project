@@ -150,53 +150,92 @@ function App() {
 
 **HomeScreen.tsx** - Use in components:
 ```typescript
-import {PipeGuru, Popup, InlineComponent} from '../sdk';
+import React from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Button } from 'react-native';
+import { CampaignRenderer } from '@pipeguru/react-native';
 
-const HomeScreen = () => {
-  // Auto-updating inline component
-  const [inlineProps, setInlineProps] = useState(() =>
-    PipeGuru.getInlineComponent('Home')
-  );
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      setInlineProps(PipeGuru.getInlineComponent('Home'));
-    };
-    PipeGuru._on('campaigns_updated', handleUpdate);
-    return () => PipeGuru._off('campaigns_updated', handleUpdate);
-  }, []);
-
-  // Auto-updating popup
-  const [popup, setPopup] = useState(() =>
-    PipeGuru.getPopupCampaign('Home')
-  );
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      setPopup(PipeGuru.getPopupCampaign('Home'));
-    };
-    PipeGuru._on('campaigns_updated', handleUpdate);
-    return () => PipeGuru._off('campaigns_updated', handleUpdate);
-  }, []);
-
+const HomeScreen = ({ navigation }) => {
   return (
-    <View>
-      {/* Your screen content */}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Home Screen</Text>
+        <Text style={styles.subtitle}>Welcome to the App!</Text>
 
-      {/* Inline component renders when active */}
-      {inlineProps && <InlineComponent {...inlineProps} />}
+        {/* Inline campaigns render here (in content flow) */}
+        <CampaignRenderer screen="Home" type="inline" />
 
-      {/* Popup renders when active */}
-      {popup && (
-        <Popup
-          visible={true}
-          {...popup.props}
-          onDismiss={() => setPopup(null)}
-        />
-      )}
-    </View>
+        <Button title="Go to Profile" onPress={() => navigation.navigate('Profile')} />
+      </View>
+
+      {/* Overlay campaigns render here (popups, permissions) */}
+      <CampaignRenderer screen="Home" type="overlay" />
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+  },
+});
+
+export default HomeScreen;
+```
+
+### Understanding the Split Rendering Pattern
+
+**Why two `CampaignRenderer` calls?**
+
+Different campaign types need different positioning:
+
+1. **Inline components** (`type="inline"`)
+   - Promo banners, announcements, offers
+   - Render **in the content flow** where you place them
+   - Example: Between welcome text and action buttons
+   - Scroll with the content
+
+2. **Overlay components** (`type="overlay"`)
+   - Popups, permission prompts
+   - Render **on top of everything** as absolute overlays
+   - Don't affect content layout
+   - Always visible regardless of scroll position
+
+**Example positioning:**
+```typescript
+<View style={styles.content}>
+  <Text>Welcome Message</Text>
+
+  {/* Promo banner appears HERE, between text and button */}
+  <CampaignRenderer screen="Home" type="inline" />
+
+  <Button>Primary Action</Button>
+</View>
+
+{/* Popup appears on top, overlaying everything */}
+<CampaignRenderer screen="Home" type="overlay" />
+```
+
+**Alternatively, render all at once** (less control over inline positioning):
+```typescript
+<View>
+  <Text>Content</Text>
+  {/* Renders all campaign types - inline will appear here */}
+  <CampaignRenderer screen="Home" />
+</View>
 ```
 
 ### Web Preview (Next.js)
@@ -232,6 +271,55 @@ export default function PreviewNativePage() {
   );
 }
 ```
+
+## CampaignRenderer: The Simplification Story
+
+### The Evolution
+
+**V1: Provider + Hooks** (Initial POC)
+- Required `<SDKProvider>` wrapper
+- Manual hooks: `useCampaigns()`, `useInlineComponent()`
+- ~40 lines of code per screen
+- Theme coupling required
+
+**V2: Imperative API** (Industry Standard)
+- No Provider needed
+- `PipeGuru.initialize()` at app level
+- Manual state + listeners per screen
+- ~60 lines of boilerplate per screen
+
+**V3: CampaignRenderer** (Final Solution) ⭐
+- Best of both worlds
+- Imperative initialization
+- Component-based rendering
+- **2 lines of code per screen**
+
+### The Breakthrough
+
+Instead of customers manually managing state and listeners, we encapsulated everything into a single `CampaignRenderer` component:
+
+**What customers write:**
+```typescript
+<CampaignRenderer screen="Home" type="inline" />
+<CampaignRenderer screen="Home" type="overlay" />
+```
+
+**What it handles internally:**
+- ✅ State management for all 3 campaign types
+- ✅ Event listener setup and cleanup
+- ✅ Auto-updates when campaigns change
+- ✅ Conditional rendering logic
+- ✅ Proper positioning (inline vs overlay)
+
+### Why This Works
+
+1. **Separation of concerns**: Content flow vs overlays
+2. **Full control**: Customers choose inline component position
+3. **Zero boilerplate**: All complexity hidden
+4. **Type-safe**: TypeScript support
+5. **Flexible**: Optional `type` prop for fine control
+
+---
 
 ## Key Technical Decisions
 

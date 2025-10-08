@@ -35,8 +35,6 @@ const PermissionPrompt: React.FC<PermissionPromptProps> = ({
 }) => {
   const [requesting, setRequesting] = useState(false);
 
-  console.log('[PermissionPrompt] Rendering:', { visible, permissionType, title });
-
   if (!visible) {
     return null;
   }
@@ -57,18 +55,14 @@ const PermissionPrompt: React.FC<PermissionPromptProps> = ({
   };
 
   const handleAllow = async () => {
-    console.log(`[PermissionPrompt] User tapped Allow for ${permissionType}`);
     setRequesting(true);
 
     try {
       // Trigger the actual OS permission dialog
       const status = await requestPermission(permissionType);
-      console.log(`[PermissionPrompt] Permission result: ${status}`);
-
       onPermissionResult?.(status);
       onDismiss?.();
     } catch (error) {
-      console.error('[PermissionPrompt] Error requesting permission:', error);
       onPermissionResult?.('denied');
       onDismiss?.();
     } finally {
@@ -77,7 +71,6 @@ const PermissionPrompt: React.FC<PermissionPromptProps> = ({
   };
 
   const handleDeny = () => {
-    console.log(`[PermissionPrompt] User denied ${permissionType}`);
     onPermissionResult?.('denied');
     onDismiss?.();
   };

@@ -29,7 +29,6 @@ class PipeGuruSDK {
    */
   initialize(apiKey: string): void {
     if (this.isInitialized) {
-      console.warn('[PipeGuru] SDK already initialized');
       return;
     }
 
@@ -39,8 +38,6 @@ class PipeGuruSDK {
     // Start fetching campaigns
     this.fetchCampaigns();
     this.pollingInterval = setInterval(() => this.fetchCampaigns(), 5000);
-
-    console.log('[PipeGuru] SDK initialized with API key:', apiKey);
   }
 
   /**
@@ -50,11 +47,9 @@ class PipeGuruSDK {
    */
   track(eventName: string, properties?: Record<string, any>): void {
     if (!this.isInitialized) {
-      console.warn('[PipeGuru] SDK not initialized. Call PipeGuru.initialize() first.');
       return;
     }
 
-    console.log('[PipeGuru] Track:', eventName, properties);
     // In production, this would send to your backend
   }
 
@@ -64,11 +59,9 @@ class PipeGuruSDK {
    */
   showExperiment(experimentId: string): void {
     if (!this.isInitialized) {
-      console.warn('[PipeGuru] SDK not initialized. Call PipeGuru.initialize() first.');
       return;
     }
 
-    console.log('[PipeGuru] Show experiment:', experimentId);
     // In production, this would trigger a specific experiment
   }
 
@@ -109,17 +102,11 @@ class PipeGuruSDK {
    */
   getPermissionPromptCampaign(screenName: string): Extract<Campaign, {component: 'PermissionPrompt'}> | null {
     const screenCampaigns = getCampaignsForScreen(this.campaigns, screenName);
-    console.log(`[PipeGuru] getPermissionPromptCampaign for "${screenName}":`, {
-      totalCampaigns: this.campaigns.length,
-      screenCampaigns: screenCampaigns.length,
-      screenCampaignIds: screenCampaigns.map(c => `${c.id} (${c.component})`),
-    });
     const prompts = screenCampaigns.filter(
       (campaign): campaign is Extract<Campaign, {component: 'PermissionPrompt'}> =>
         campaign.component === 'PermissionPrompt',
     );
 
-    console.log(`[PipeGuru] Found ${prompts.length} PermissionPrompt campaigns`);
     return prompts.length > 0 ? prompts[0] : null;
   }
 
@@ -136,7 +123,6 @@ class PipeGuruSDK {
 
     // If campaigns are already loaded, immediately call the callback
     if (event === 'campaigns_updated' && this.campaigns.length > 0) {
-      console.log('[PipeGuru] Listener added for campaigns_updated, immediately calling with existing campaigns');
       callback(this.campaigns);
     }
   }
@@ -173,11 +159,6 @@ class PipeGuruSDK {
     try {
       const newCampaigns = await loadCampaigns();
 
-      console.log('[PipeGuru] fetchCampaigns result:', {
-        count: newCampaigns.length,
-        campaigns: newCampaigns.map(c => ({ id: c.id, component: c.component, screen: c.trigger.screen, active: c.active })),
-      });
-
       // Check if campaigns actually changed
       const campaignsChanged =
         JSON.stringify(this.campaigns) !== JSON.stringify(newCampaigns);
@@ -185,11 +166,10 @@ class PipeGuruSDK {
       this.campaigns = newCampaigns;
 
       if (campaignsChanged) {
-        console.log('[PipeGuru] Campaigns changed, emitting event');
         this.emit('campaigns_updated', this.campaigns);
       }
     } catch (error) {
-      console.error('[PipeGuru] Failed to fetch campaigns:', error);
+      // Silently fail in production
     }
   }
 
