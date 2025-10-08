@@ -157,6 +157,40 @@ Backend API (port 4000)
 
 ---
 
+## Network Resilience Considerations
+
+### Current POC Behavior (Network Failures)
+**What happens when network is unavailable:**
+- ❌ `loadCampaigns()` catches error and returns empty array
+- ❌ All campaigns disappear immediately (popups hidden, inline components invisible)
+- ❌ No caching - previously loaded campaigns are lost
+- ❌ No retry logic - failed requests fail silently
+- ✅ Polling continues every 5s (good for auto-recovery when network returns)
+
+### Production-Ready Approach (Recommended)
+
+**1. Cache Last Successful Response**
+- Store campaigns in AsyncStorage/localStorage when successfully fetched
+- On network failure, use cached campaigns instead of empty array
+- User sees last known campaigns even offline
+- Campaigns remain visible during temporary network interruptions
+
+**2. Graceful Degradation**
+- Show cached campaigns but don't poll while offline
+- Listen to network state changes (React Native NetInfo)
+- Resume polling when connectivity returns
+- Reduces battery drain and unnecessary API calls
+
+**3. Stale-While-Revalidate Pattern**
+- Immediately show cached campaigns on app launch
+- Fetch fresh campaigns in background
+- Update UI if newer campaigns available
+- Provides instant user experience, stays up-to-date
+
+**Implementation Estimate**: ~50 lines of code for full offline support
+
+---
+
 ## What Doesn't Work ❌
 
 ### 1. **React Navigation Integration**
@@ -234,6 +268,138 @@ Backend API (port 4000)
 6. Preview updates → shows new message
 
 **Result**: Change appears in both native app and web preview within 5 seconds, no app release needed.
+
+---
+
+## Production Deployment Architecture
+
+### Current POC Setup (Local Development)
+```
+Local Machine (10.10.110.62:4000)
+├─ Backend API (Express)
+├─ Dashboard (localhost:3000)
+└─ DummyApp SDK → Hardcoded local IP
+```
+
+**Limitation**: Only works on local network, hardcoded IP addresses in:
+- `/config.ts` (shared)
+- `/DummyApp/src/sdk/config.ts` (SDK)
+- `/dashboard/app/page.tsx` (dashboard)
+
+### Production-Ready Approach
+
+**1. Backend Deployment (Cloud)**
+```
+Backend: https://api.pipeguru.com
+├─ Deploy to: Vercel/Railway/AWS/GCP
+├─ Multi-tenant: Isolated campaigns per client (by apiKey)
+├─ Persistent storage: Database instead of in-memory
+└─ API endpoints: /v1/campaigns?apiKey=xxx
+```
+
+**2. SDK Distribution (NPM Package)**
+```typescript
+// Client installs SDK
+npm install @pipeguru/react-native-sdk
+
+// Client configures in App.tsx
+import { SDKProvider } from '@pipeguru/react-native-sdk';
+
+<SDKProvider
+  apiKey="client_prod_key_abc123"  // ✅ Only this needed
+  theme={appTheme}
+>
+  <App />
+</SDKProvider>
+```
+
+**SDK automatically resolves backend:**
+```typescript
+const API_URL = __DEV__
+  ? 'https://staging-api.pipeguru.com'  // Development
+  : 'https://api.pipeguru.com';         // Production
+
+// Client never needs to know backend URL
+// SDK handles everything internally
+```
+
+**3. Dashboard Deployment (Public Web App)**
+```
+Dashboard: https://dashboard.pipeguru.com
+├─ Marketing team logs in
+├─ Manages campaigns (create/edit/toggle)
+├─ React Native Web preview (uses same API)
+└─ Changes deploy instantly to client apps
+```
+
+### Production Architecture Diagram
+
+```
+┌────────────────────────────────────────────────────┐
+│ CLIENT'S APP (One-time setup)                      │
+│ ┌────────────────────────────────────────────────┐ │
+│ │ npm install @pipeguru/react-native-sdk        │ │
+│ │                                                │ │
+│ │ <SDKProvider apiKey="client_key">             │ │
+│ │   <App />                                      │ │
+│ │ </SDKProvider>                                 │ │
+│ │                                                │ │
+│ │ Deploy to App Store/Play Store (once)         │ │
+│ └────────────────────────────────────────────────┘ │
+└─────────────────────┬──────────────────────────────┘
+                      ↓ HTTPS
+┌────────────────────────────────────────────────────┐
+│ PIPEGURU INFRASTRUCTURE (Your control)             │
+├────────────────────────────────────────────────────┤
+│ Backend: api.pipeguru.com                          │
+│  ├─ GET /v1/campaigns?apiKey=client_key           │
+│  ├─ Multi-tenant (isolated per client)            │
+│  └─ Returns active campaigns for that client      │
+│                                                    │
+│ Dashboard: dashboard.pipeguru.com                  │
+│  ├─ Marketing team creates/edits campaigns        │
+│  ├─ Live preview (React Native Web)               │
+│  └─ Changes visible in client apps within 5s      │
+└────────────────────────────────────────────────────┘
+```
+
+### Key Considerations
+
+**Feasibility**: ✅ 100% - Standard SaaS SDK architecture
+
+**SDK Distribution Options:**
+
+1. **NPM Package (Recommended)**
+   - ✅ Client installs via `npm install @pipeguru/react-native-sdk`
+   - ✅ Updates via standard npm version updates
+   - ✅ SDK handles all backend communication internally
+   - ✅ Client only provides `apiKey` - no backend URL needed
+   - ✅ Standard approach (Firebase, Amplitude, Sentry all work this way)
+
+2. **Code Injection (Alternative)**
+   - ⚠️ Client shares their codebase
+   - ⚠️ You manually add SDK code
+   - ⚠️ Every update requires code change + rebuild
+   - ⚠️ Security/trust implications
+
+**Backend Requirements:**
+- Multi-tenancy: Isolate campaigns by `apiKey`
+- Persistent storage: Database (PostgreSQL/MongoDB) instead of in-memory
+- Authentication: API key validation per request
+- CORS: Allow dashboard domain
+
+**No App Release Required:**
+- ✅ SDK installed once in client app
+- ✅ All campaign changes via backend API
+- ✅ Apps poll every 5s for updates
+- ✅ Changes appear instantly without App Store review
+
+**Migration from POC:**
+- Change hardcoded IPs to environment variables
+- Add `apiKey` prop to `SDKProvider`
+- Deploy backend to cloud provider
+- Package SDK as npm module
+- **Estimated effort**: ~2-3 days
 
 ---
 

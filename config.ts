@@ -2,7 +2,7 @@
 // Change this IP address when switching networks
 export const SHARED_CONFIG = {
   // Your local machine's IP address on the current network
-  API_HOST: '10.10.110.63',
+  API_HOST: '10.10.110.62',
   API_PORT: 4000,
 } as const;
 
