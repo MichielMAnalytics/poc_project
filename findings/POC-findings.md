@@ -9,9 +9,10 @@
 
 ✅ **The POC is successful.** We can:
 1. Install a lightweight SDK in a React Native app (one-time integration)
-2. Create campaign variations (popups) that inherit the app's exact styling
+2. Create campaign variations (popups, inline components, permission prompts) that inherit the app's exact styling
 3. Preview these campaigns in a web browser showing the real app UI
 4. Deploy campaigns in real-time without app releases
+5. Inject components inline between existing UI elements with full remote control
 
 ---
 
@@ -88,7 +89,59 @@ Browser (shows actual app with popup)
 - ⚠️ **Prerequisite**: Permission must be declared in Info.plist (iOS) or supported by browser
 - ⚠️ **Limitation**: Cannot control native permission dialog styling (OS-controlled)
 
-### 6. **Data Flow & Single Source of Truth**
+### 6. **Inline Component Injection**
+- ✅ Dynamically inject components between existing UI elements
+- ✅ Fully customizable styling (colors, padding, borders, alignment)
+- ✅ Support for heading, body, caption, icon, and buttons
+- ✅ Conditionally renders (invisible when inactive)
+- ✅ No layout shifts or placeholders when disabled
+- ✅ Works seamlessly in both native app and web preview
+
+**Example Inline Component Campaign**:
+```json
+{
+  "id": "promo_banner",
+  "component": "InlineComponent",
+  "trigger": {"type": "screen_enter", "screen": "Home"},
+  "props": {
+    "icon": "🎁",
+    "heading": "Special Offer!",
+    "body": "Get 50% off your first purchase. Limited time only!",
+    "button": {
+      "text": "Claim Now",
+      "backgroundColor": "#007AFF",
+      "textColor": "#FFFFFF"
+    },
+    "style": {
+      "backgroundColor": "#FFE5E5",
+      "textColor": "#333333",
+      "padding": 20,
+      "borderRadius": 16
+    },
+    "alignment": "left"
+  },
+  "active": true
+}
+```
+
+**Integration**:
+```typescript
+// In any screen (e.g., HomeScreen.tsx)
+const inlineComponentProps = useInlineComponent('Home');
+
+// Render inline
+{inlineComponentProps && <InlineComponent {...inlineComponentProps} />}
+```
+
+**Remote Control Capabilities**:
+- Text content (heading, body, caption)
+- Visual styling (colors, padding, borders, shadows)
+- Layout (alignment: left/center/right)
+- Buttons (text, colors, actions)
+- Icons/emojis
+- Enable/disable via toggle
+
+### 7. **Data Flow & Single Source of Truth**
 - ✅ Backend API is single source of truth for campaigns
 - ✅ App configuration can be exported and shared with web preview
 - ✅ Example: `INITIAL_PARAMS` exported from `navigationConfig.ts`
@@ -98,8 +151,8 @@ Browser (shows actual app with popup)
 ```
 Backend API (port 4000)
   ↓ (GET /campaigns every 5s)
-  ├─→ Native App (iOS/Android) → Shows popup
-  └─→ Web Preview → Shows same popup
+  ├─→ Native App (iOS/Android) → Shows campaigns (popups, inline components, permissions)
+  └─→ Web Preview → Shows same campaigns
 ```
 
 ---
