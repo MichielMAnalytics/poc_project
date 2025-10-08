@@ -8,4 +8,4 @@ export const INITIAL_PARAMS = {
   Home: {
     username: 'Jane Smith',
   },
-} as const;
+};

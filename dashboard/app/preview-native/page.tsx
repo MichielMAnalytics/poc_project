@@ -1,18 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native-web';
 import HomeScreen from '@app/screens/HomeScreen';
 import ProfileScreen from '@app/screens/ProfileScreen';
 import SettingsScreen from '@app/screens/SettingsScreen';
-import { SDKProvider } from '@app/sdk';
-import { appTheme } from '@app/theme/appTheme';
+import PipeGuru from '@app/sdk';
 import { INITIAL_PARAMS } from '@app/config/navigationConfig';
 
 type Screen = 'Home' | 'Profile' | 'Settings';
 
 export default function PreviewNativePage() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('Home');
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize PipeGuru only on client-side after mount
+  useEffect(() => {
+    console.log('[PreviewNative] Initializing PipeGuru');
+    PipeGuru.initialize('demo-api-key');
+
+    // Wait for initial campaigns to load before rendering screens
+    const handleFirstLoad = () => {
+      console.log('[PreviewNative] First campaigns loaded, setting initialized');
+      setIsInitialized(true);
+      PipeGuru._off('campaigns_updated', handleFirstLoad);
+    };
+
+    PipeGuru._on('campaigns_updated', handleFirstLoad);
+  }, []);
 
   // Mock navigation object for screens
   const mockNavigation: any = {
@@ -82,11 +97,17 @@ export default function PreviewNativePage() {
 
           {/* React Native App Container */}
           <div className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden">
-            <SDKProvider theme={appTheme} apiKey="demo-api-key">
+            {isInitialized ? (
               <View style={styles.appContainer}>
                 {renderScreen()}
               </View>
-            </SDKProvider>
+            ) : (
+              <View style={styles.appContainer}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                  <p>Loading...</p>
+                </div>
+              </View>
+            )}
           </div>
         </div>
       </div>

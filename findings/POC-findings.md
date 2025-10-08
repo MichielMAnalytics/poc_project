@@ -403,6 +403,439 @@ Dashboard: https://dashboard.pipeguru.com
 
 ---
 
+## SDK Architecture: Provider vs. Imperative API
+
+### Comparison of Approaches
+
+The SDK can be implemented with two different architectural patterns. This section compares both approaches to inform the final decision.
+
+| Feature | Provider-Based (`<SDKProvider>`) | Imperative API (`PipeGuru.initialize()`) | Value Assessment |
+|---------|----------------------------------|------------------------------------------|------------------|
+| **React Context Propagation** | ✅ Automatic via React Context | ⚠️ Manual access via singleton | 🔵 Medium - Context is cleaner but singleton works |
+| **Theme Inheritance** | ✅ Via React Context | ⚠️ Store in singleton | 🟢 High - Both achieve same result |
+| **Configuration** | ✅ Props-based config | ⚠️ Method parameters | 🔵 Medium - Both work, provider slightly cleaner |
+| **React DevTools Visibility** | ✅ Visible in component tree | ❌ External to React | 🟡 Low - Nice for debugging but not critical |
+| **Lifecycle Management** | ✅ Automatic cleanup via useEffect | ⚠️ Manual management | 🟢 High - Both can handle properly |
+| **Hot Reloading Support** | ✅ Automatic re-render | ⚠️ Manual refresh needed | 🔵 Medium - Dev convenience only |
+| **Multiple SDK Instances** | ✅ Possible with nested providers | ❌ Singleton pattern only | 🟡 Low - Rarely needed in mobile apps |
+| **Runtime Config Changes** | ✅ Easy via prop updates | ⚠️ Requires reinitialize | 🔵 Medium - Provider cleaner for dynamic config |
+| **Scoped Campaign Visibility** | ✅ Possible via provider nesting | ❌ Global campaigns only | 🟡 Low - Global campaigns preferred |
+| **Integration Effort** | ⚠️ Requires App.tsx refactoring | ✅ One-line initialization | 🔴 Critical - Lower barrier = faster adoption |
+| **Theme Coupling** | ⚠️ Requires theme object export | ✅ Optional theme config | 🔴 Critical - Many apps lack centralized themes |
+| **Testing Complexity** | ⚠️ Must wrap every test | ✅ Simple mock | 🟡 Low-Medium - Developer friction |
+| **Class Component Support** | ❌ Hooks require functional components | ✅ Works with any component type | 🔴 Critical - Enterprise legacy code |
+| **Non-React Usage** | ❌ Only works in React components | ✅ Works anywhere (handlers, middleware) | 🔴 Critical - Real-world integration points |
+| **Enterprise Familiarity** | ⚠️ Less common pattern | ✅ Standard SDK pattern (Segment, Mixpanel) | 🟢 High - Matches expectations |
+| **Inline Components** | ✅ Natural with hooks | ⚠️ Requires manual state management | 🟢 High - Core differentiator |
+| **Real-time Updates** | ✅ Automatic re-renders | ⚠️ Manual event listeners + setState | 🟢 High - Core value proposition |
+
+### Key Insights from Comparison
+
+**Provider-Based Strengths:**
+- Natural React patterns (context, hooks)
+- Automatic lifecycle and cleanup
+- Inline components work seamlessly
+- Real-time updates with auto re-renders
+
+**Provider-Based Weaknesses:**
+- Requires App.tsx refactoring (high barrier to entry)
+- Doesn't work with class components (blocks legacy apps)
+- Doesn't work outside React components (limits use cases)
+- Requires theme object (coupling issue)
+- Higher perceived integration effort (slower sales)
+
+**Imperative API Strengths:**
+- Familiar enterprise pattern (like Segment, Firebase, Braze)
+- One-line integration (low barrier to entry)
+- Works with class components (legacy support)
+- Works anywhere (push handlers, navigation, middleware)
+- No theme coupling required
+
+**Imperative API Weaknesses:**
+- Inline components require manual state management
+- Real-time updates need manual event listeners
+- Not as "React-native" feeling
+- More boilerplate for React developers
+
+### Option 1: Pure Hook-Based Approach (Current POC)
+
+**Architecture:**
+```
+<SDKProvider> (required) → React Context → Hooks → Components
+```
+
+**Customer Installation:**
+
+**Step 1: Install Package**
+```bash
+npm install @pipeguru/react-native
+```
+
+**Step 2: Wrap App (Required)**
+```typescript
+// App.tsx
+import { SDKProvider } from '@pipeguru/react-native';
+import { appTheme } from './theme'; // Must have theme object
+
+function App() {
+  return (
+    <SDKProvider theme={appTheme} apiKey="your_api_key_here">
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    </SDKProvider>
+  );
+}
+```
+
+**Step 3: Use in Screens**
+```typescript
+// HomeScreen.tsx
+import { useCampaigns, useInlineComponent, InlineComponent } from '@pipeguru/react-native';
+
+const HomeScreen = () => {
+  // Track screen view
+  const { trackEvent } = useCampaigns('Home');
+
+  useEffect(() => {
+    trackEvent('screen_viewed');
+  }, []);
+
+  // Get inline component
+  const inlineProps = useInlineComponent('Home');
+
+  return (
+    <View>
+      <Text>Welcome</Text>
+      {inlineProps && <InlineComponent {...inlineProps} />}
+      <Button>Continue</Button>
+    </View>
+  );
+};
+```
+
+**Step 4: Track Events Anywhere (Requires Hook Wrapper)**
+```typescript
+// For tracking outside screens, need helper hook
+const useTracking = () => {
+  const { trackEvent } = useCampaigns();
+  return trackEvent;
+};
+
+// Or use imperative helper
+import { trackEvent } from '@pipeguru/react-native';
+trackEvent('button_clicked', { button_id: 'subscribe' });
+```
+
+#### Pros of Pure Hook-Based Approach
+
+**1. Clean React Architecture** 🟢
+- Everything is a hook or component
+- Natural React patterns throughout
+- Context provides global state management
+- No singletons or global variables
+
+**2. Automatic Re-rendering** 🟢
+- Components automatically re-render when campaigns update
+- Real-time updates "just work"
+- No manual event listeners needed
+- No manual setState calls
+
+**3. Type Safety** 🟢
+- TypeScript context types ensure type safety
+- Props flow through React tree with full typing
+- IDE autocomplete works perfectly
+- Compile-time error checking
+
+**4. Declarative API** 🟢
+```typescript
+// Very React-native way
+const inlineProps = useInlineComponent('Home');
+return <View>{inlineProps && <InlineComponent {...inlineProps} />}</View>
+```
+
+**5. Testing Integration** 🔵
+```typescript
+// Familiar testing pattern
+render(
+  <SDKProvider theme={mockTheme} apiKey="test">
+    <HomeScreen />
+  </SDKProvider>
+);
+```
+
+**6. Hot Reloading** 🔵
+- Changes to theme/config auto-update
+- No manual refresh needed
+- Better DX during development
+
+#### Cons of Pure Hook-Based Approach
+
+**1. Integration Barrier** 🔴 CRITICAL
+- **Must** refactor App.tsx to add provider
+- **Must** have/create theme object
+- Higher perceived effort ("wrap my entire app")
+- Longer onboarding conversation with engineering teams
+
+**Customer objection:**
+> "Why do I need to restructure my app just to track events?"
+
+**2. No Class Component Support** 🔴 CRITICAL
+```typescript
+// ❌ Doesn't work
+class HomeScreen extends Component {
+  render() {
+    const campaign = useCampaigns('Home'); // ERROR: Hooks only work in functional components
+    return <View />;
+  }
+}
+```
+
+**Enterprise reality:**
+- 40-60% of enterprise React Native apps have legacy class components
+- Refactoring class → functional is significant effort
+- Engineering teams will reject SDK if it requires refactoring
+
+**3. Can't Use Outside React Components** 🔴 CRITICAL
+
+**Real-world scenarios that DON'T work:**
+
+```typescript
+// ❌ Push notification handler (not a React component)
+messaging().onMessage((notification) => {
+  const campaign = useCampaigns(); // ERROR: Not in component
+  trackEvent('push_received'); // ERROR: How to track?
+});
+
+// ❌ Deep link handler
+Linking.addEventListener('url', ({ url }) => {
+  trackEvent('deep_link_opened', { url }); // ERROR: How?
+});
+
+// ❌ Navigation middleware
+navigationRef.addListener('state', () => {
+  trackEvent('screen_changed'); // ERROR: Not in component
+});
+
+// ❌ Background task
+BackgroundFetch.registerTaskAsync('sync', async () => {
+  trackEvent('background_sync'); // ERROR: Not in component
+});
+
+// ❌ Redux middleware
+const analyticsMiddleware = store => next => action => {
+  trackEvent('action_dispatched', { type: action.type }); // ERROR: How?
+  return next(action);
+};
+```
+
+**Workaround Required:**
+```typescript
+// Must expose imperative API anyway
+import PipeGuru from '@pipeguru/react-native';
+
+messaging().onMessage((notification) => {
+  PipeGuru.track('push_received'); // Now need imperative API!
+});
+```
+
+**If you need imperative API anyway, why force provider?**
+
+**4. Theme Coupling** 🔴 CRITICAL
+
+```typescript
+<SDKProvider theme={appTheme}> // Where does appTheme come from?
+```
+
+**Customer scenarios:**
+
+**Scenario A: No centralized theme (40-50% of apps)**
+```typescript
+// Their codebase has scattered styles
+const styles = StyleSheet.create({
+  button: { backgroundColor: '#007AFF' } // Hardcoded everywhere
+});
+
+// Now they must create theme object just for your SDK
+const appTheme = {
+  colors: { primary: '#007AFF', ... }, // Manual extraction
+  fonts: { regular: 'System', ... },
+  spacing: { ... }
+};
+```
+
+**Customer objection:**
+> "We don't have a theme system. Creating one just for your SDK is a lot of work."
+
+**Scenario B: Different theme structure (30% of apps)**
+```typescript
+// They use React Native Paper
+import { DefaultTheme } from 'react-native-paper';
+
+// Your SDK expects different structure
+<SDKProvider theme={DefaultTheme}> // Might not match your expected format
+```
+
+**You need theme adapter/mapping layer.**
+
+**Scenario C: Dynamic themes (10% of apps)**
+```typescript
+// User can toggle dark/light mode
+const [isDark, setIsDark] = useState(false);
+const theme = isDark ? darkTheme : lightTheme;
+
+<SDKProvider theme={theme}> // Provider re-mounts? Performance?
+```
+
+**5. Testing Boilerplate** 🟡 MEDIUM
+
+```typescript
+// Every single test needs provider wrapper
+describe('HomeScreen', () => {
+  it('renders correctly', () => {
+    render(
+      <SDKProvider theme={mockTheme} apiKey="test">
+        <HomeScreen />
+      </SDKProvider>
+    );
+  });
+
+  it('tracks event', () => {
+    render(
+      <SDKProvider theme={mockTheme} apiKey="test">
+        <HomeScreen />
+      </SDKProvider>
+    );
+  });
+
+  // Repeat for every test...
+});
+```
+
+**Developers will complain about boilerplate.**
+
+**6. Provider Order Dependencies** 🟡 MEDIUM
+
+```typescript
+// Where does SDKProvider go in provider hierarchy?
+<AuthProvider>           // Needs to be outermost (provides user)
+  <ThemeProvider>        // Needs user from Auth
+    <SDKProvider>        // Needs theme from ThemeProvider
+      <I18nProvider>     // Where does this go?
+        <NavigationContainer> // And this?
+          <App />
+        </NavigationContainer>
+      </I18nProvider>
+    </SDKProvider>
+  </ThemeProvider>
+</AuthProvider>
+```
+
+**Customer question:**
+> "What if I need to access user data in my SDKProvider config?"
+
+**Potential ordering bugs and confusion.**
+
+**7. Limited Functionality Without Imperative Escape Hatch** 🔴 CRITICAL
+
+**To support all use cases, you MUST add imperative API anyway:**
+
+```typescript
+// For non-React contexts
+export const trackEvent = (name: string, props?: object) => {
+  // Accesses internal singleton/context anyway
+};
+
+export const showExperiment = (id: string) => {
+  // Accesses internal singleton/context anyway
+};
+```
+
+**At this point, you have both patterns. Why not lead with imperative?**
+
+#### Pure Hook-Based Approach: Summary
+
+**Installation Effort:** 🔴 High
+- Modify App.tsx (required)
+- Create/export theme object (required)
+- Understand provider hierarchy (required)
+- Refactor class components (if any)
+
+**Enterprise Adoption:** 🔴 Difficult
+- High barrier to entry
+- Blocks apps with class components
+- Requires theme system
+- Doesn't cover all use cases
+
+**Developer Experience:** 🟢 Good (for modern React apps)
+- Clean React patterns
+- Auto re-rendering
+- Type safety
+- Familiar testing
+
+**Functionality:** ⚠️ Incomplete
+- Can't track from non-React contexts
+- Requires imperative escape hatch anyway
+- Limited to functional components
+
+**Verdict:**
+✅ Great for greenfield React apps with modern architecture
+❌ Problematic for enterprise apps with legacy code
+⚠️ Requires imperative API anyway for full functionality
+
+---
+
+### Option 2: Hybrid Approach (Recommended)
+
+**Best of both worlds:**
+1. **Core SDK**: Imperative singleton (handles campaigns, tracking, storage)
+2. **React Helpers**: Optional hooks that wrap the singleton
+3. **Provider**: Optional convenience wrapper (not required)
+
+**This allows:**
+- ✅ Quick integration: `PipeGuru.initialize()` for basic adoption
+- ✅ React patterns: Hooks available for teams that prefer them
+- ✅ Inline components: Still work via optional hooks
+- ✅ Maximum flexibility: Works in any context
+- ✅ No theme coupling: Theme is optional config
+- ✅ Class component support: Imperative API works anywhere
+
+**Customer Installation (Hybrid):**
+
+**Minimal Integration (No Provider):**
+```typescript
+// App.tsx - ONE LINE
+import PipeGuru from '@pipeguru/react-native';
+PipeGuru.initialize('your_api_key');
+
+// Works with class components
+class HomeScreen extends Component {
+  componentDidMount() {
+    PipeGuru.track('screen_viewed');
+  }
+}
+
+// Works outside React
+messaging().onMessage(() => {
+  PipeGuru.track('push_received');
+});
+```
+
+**Advanced Integration (With Hooks):**
+```typescript
+// Optional: Use hooks for inline components
+import { useInlineComponent, InlineComponent } from '@pipeguru/react-native';
+
+const HomeScreen = () => {
+  const inlineProps = useInlineComponent('Home');
+  return <View>{inlineProps && <InlineComponent {...inlineProps} />}</View>;
+};
+```
+
+**Both work together. Customer chooses based on needs.**
+
+---
+
 ## Technical Limitations
 
 ### 1. **Platform-Specific Code**
@@ -590,3 +1023,7 @@ Most UI renders correctly. Modal positioning has issues but campaigns are still 
 **Recommendation**: Proceed with production development. The technical foundation is solid and the approach is viable for customer deployments.
 
 
+
+current bug:
+  The difference is timing. When hot-reloading, the screen component re-mounts AFTER campaigns are
+  already loaded. On fresh reload, the screen mounts BEFORE campaigns load.

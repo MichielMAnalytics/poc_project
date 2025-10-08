@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
-import {Modal, View, Text, TouchableOpacity, StyleSheet} from 'react-native';
-import {useTheme} from '../ThemeContext';
+import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {
   requestPermission,
   type PermissionType,
@@ -34,8 +33,13 @@ const PermissionPrompt: React.FC<PermissionPromptProps> = ({
   onPermissionResult,
   onDismiss,
 }) => {
-  const theme = useTheme();
   const [requesting, setRequesting] = useState(false);
+
+  console.log('[PermissionPrompt] Rendering:', { visible, permissionType, title });
+
+  if (!visible) {
+    return null;
+  }
 
   const getIcon = () => {
     switch (permissionType) {
@@ -78,14 +82,10 @@ const PermissionPrompt: React.FC<PermissionPromptProps> = ({
     onDismiss?.();
   };
 
+  // Use absolutely positioned View instead of Modal for web compatibility
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onDismiss}>
-      <View style={styles.overlay}>
-        <View style={styles.prompt}>
+    <View style={styles.overlay}>
+      <View style={styles.prompt}>
           {/* Icon */}
           <View style={styles.iconContainer}>
             <Text style={styles.icon}>{getIcon()}</Text>
@@ -116,17 +116,21 @@ const PermissionPrompt: React.FC<PermissionPromptProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
-    </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 9999,
     padding: 20,
   },
   prompt: {
@@ -140,6 +144,7 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 8,
+    zIndex: 10000,
   },
   iconContainer: {
     alignItems: 'center',

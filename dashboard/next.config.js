@@ -6,10 +6,10 @@ const nextConfig = {
     // Merge existing alias
     const existingAlias = config.resolve.alias || {};
 
-    // Set react-native alias to react-native-web
+    // Set react-native alias to react-native-web (for both client and server)
     config.resolve.alias = {
       ...existingAlias,
-      'react-native': 'react-native-web',
+      'react-native$': 'react-native-web',
       '@app': path.resolve(__dirname, '../DummyApp/src'),
     };
 
@@ -25,14 +25,6 @@ const nextConfig = {
       ...extensions,
       ...(config.resolve.extensions || []),
     ];
-
-    // Exclude react-native from server-side rendering
-    if (isServer) {
-      config.externals = config.externals || [];
-      if (Array.isArray(config.externals)) {
-        config.externals.push('react-native');
-      }
-    }
 
     return config;
   },

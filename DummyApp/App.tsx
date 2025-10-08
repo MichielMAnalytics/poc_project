@@ -8,15 +8,17 @@
 import React from 'react';
 import {StatusBar} from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
-import {SDKProvider} from './src/sdk';
-import {appTheme} from './src/theme/appTheme';
+import PipeGuru from './src/sdk';
+
+// Initialize PipeGuru with your API key
+PipeGuru.initialize('demo-api-key');
 
 function App() {
   return (
-    <SDKProvider theme={appTheme} apiKey="demo-api-key">
+    <>
       <StatusBar barStyle="light-content" backgroundColor="#007AFF" />
       <AppNavigator />
-    </SDKProvider>
+    </>
   );
 }
 

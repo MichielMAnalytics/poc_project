@@ -1,6 +1,6 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
-import {useTheme} from '../ThemeContext';
+import {defaultTheme} from '../theme';
 
 export interface InlineComponentStyle {
   backgroundColor?: string;
@@ -48,8 +48,6 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
   style = {},
   alignment = 'left',
 }) => {
-  const theme = useTheme();
-
   // Return null if no content is provided
   const hasContent = heading || body || caption || icon || button || secondaryButton;
   if (!hasContent) {
@@ -67,11 +65,11 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
       style={[
         styles.container,
         {
-          backgroundColor: style.backgroundColor || theme.colors.surface,
+          backgroundColor: style.backgroundColor || defaultTheme.colors.surface,
           padding: style.padding ?? 16,
           borderRadius: style.borderRadius ?? 12,
           borderWidth: style.borderWidth ?? 0,
-          borderColor: style.borderColor || theme.colors.border,
+          borderColor: style.borderColor || defaultTheme.colors.border,
           marginVertical: style.marginVertical ?? 16,
           opacity: style.opacity ?? 1,
           alignItems,
@@ -86,7 +84,7 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
           style={[
             styles.heading,
             {
-              color: style.textColor || theme.colors.text,
+              color: style.textColor || defaultTheme.colors.text,
               textAlign,
             },
           ]}>
@@ -100,7 +98,7 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
           style={[
             styles.body,
             {
-              color: style.textColor || theme.colors.text,
+              color: style.textColor || defaultTheme.colors.text,
               textAlign,
             },
           ]}>
@@ -114,7 +112,7 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
           style={[
             styles.caption,
             {
-              color: style.textColor || theme.colors.textSecondary,
+              color: style.textColor || defaultTheme.colors.textSecondary,
               textAlign,
             },
           ]}>
@@ -132,7 +130,7 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
                 styles.secondaryButton,
                 {
                   backgroundColor: secondaryButton.backgroundColor || 'transparent',
-                  borderColor: secondaryButton.textColor || theme.colors.primary,
+                  borderColor: secondaryButton.textColor || defaultTheme.colors.primary,
                 },
               ]}
               onPress={secondaryButton.onPress}>
@@ -140,7 +138,7 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
                 style={[
                   styles.buttonText,
                   {
-                    color: secondaryButton.textColor || theme.colors.primary,
+                    color: secondaryButton.textColor || defaultTheme.colors.primary,
                   },
                 ]}>
                 {secondaryButton.text}
@@ -154,7 +152,7 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
                 styles.button,
                 styles.primaryButton,
                 {
-                  backgroundColor: button.backgroundColor || theme.colors.primary,
+                  backgroundColor: button.backgroundColor || defaultTheme.colors.primary,
                 },
               ]}
               onPress={button.onPress}>

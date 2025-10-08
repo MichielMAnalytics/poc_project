@@ -1,13 +1,12 @@
 import React from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import {useTheme} from '../ThemeContext';
+import {defaultTheme} from '../theme';
 
 export interface PopupProps {
   visible: boolean;
@@ -30,118 +29,124 @@ const Popup: React.FC<PopupProps> = ({
   onSecondaryPress,
   onDismiss,
 }) => {
-  const theme = useTheme();
+  const theme = defaultTheme;
 
+  console.log('[Popup] Rendering with visible:', visible, 'title:', title);
+
+  if (!visible) {
+    return null;
+  }
+
+  // Use absolutely positioned View instead of Modal for web compatibility
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onDismiss}>
-      <View style={styles.overlay}>
-        <View
+    <View style={styles.overlay}>
+      <View
+        style={[
+          styles.popup,
+          {
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            padding: theme.spacing.lg,
+          },
+        ]}>
+        {/* Title */}
+        <Text
           style={[
-            styles.popup,
+            styles.title,
             {
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
+              color: theme.colors.text,
+              fontFamily: theme.fonts.bold,
+              marginBottom: theme.spacing.sm,
             },
           ]}>
-          {/* Title */}
-          <Text
-            style={[
-              styles.title,
-              {
-                color: theme.colors.text,
-                fontFamily: theme.fonts.bold,
-                marginBottom: theme.spacing.sm,
-              },
-            ]}>
-            {title}
-          </Text>
+          {title}
+        </Text>
 
-          {/* Message */}
-          <Text
-            style={[
-              styles.message,
-              {
-                color: theme.colors.textSecondary,
-                fontFamily: theme.fonts.regular,
-                marginBottom: theme.spacing.lg,
-              },
-            ]}>
-            {message}
-          </Text>
+        {/* Message */}
+        <Text
+          style={[
+            styles.message,
+            {
+              color: theme.colors.textSecondary,
+              fontFamily: theme.fonts.regular,
+              marginBottom: theme.spacing.lg,
+            },
+          ]}>
+          {message}
+        </Text>
 
-          {/* Buttons */}
-          <View style={styles.buttonContainer}>
-            {primaryButton && (
-              <TouchableOpacity
+        {/* Buttons */}
+        <View style={styles.buttonContainer}>
+          {primaryButton && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.primaryButton,
+                {
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: theme.borderRadius.md,
+                  paddingVertical: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.lg,
+                },
+              ]}
+              onPress={onPrimaryPress}>
+              <Text
                 style={[
-                  styles.button,
-                  styles.primaryButton,
+                  styles.buttonText,
+                  styles.primaryButtonText,
                   {
-                    backgroundColor: theme.colors.primary,
-                    borderRadius: theme.borderRadius.md,
-                    paddingVertical: theme.spacing.md,
-                    paddingHorizontal: theme.spacing.lg,
+                    fontFamily: theme.fonts.bold,
                   },
-                ]}
-                onPress={onPrimaryPress}>
-                <Text
-                  style={[
-                    styles.buttonText,
-                    styles.primaryButtonText,
-                    {
-                      fontFamily: theme.fonts.bold,
-                    },
-                  ]}>
-                  {primaryButton}
-                </Text>
-              </TouchableOpacity>
-            )}
+                ]}>
+                {primaryButton}
+              </Text>
+            </TouchableOpacity>
+          )}
 
-            {secondaryButton && (
-              <TouchableOpacity
+          {secondaryButton && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.secondaryButton,
+                {
+                  borderColor: theme.colors.border,
+                  borderRadius: theme.borderRadius.md,
+                  paddingVertical: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.lg,
+                },
+              ]}
+              onPress={onSecondaryPress}>
+              <Text
                 style={[
-                  styles.button,
-                  styles.secondaryButton,
+                  styles.buttonText,
+                  styles.secondaryButtonText,
                   {
-                    borderColor: theme.colors.border,
-                    borderRadius: theme.borderRadius.md,
-                    paddingVertical: theme.spacing.md,
-                    paddingHorizontal: theme.spacing.lg,
+                    color: theme.colors.text,
+                    fontFamily: theme.fonts.medium,
                   },
-                ]}
-                onPress={onSecondaryPress}>
-                <Text
-                  style={[
-                    styles.buttonText,
-                    styles.secondaryButtonText,
-                    {
-                      color: theme.colors.text,
-                      fontFamily: theme.fonts.medium,
-                    },
-                  ]}>
-                  {secondaryButton}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+                ]}>
+                {secondaryButton}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-    </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    zIndex: 9999,
   },
   popup: {
     width: Dimensions.get('window').width - 80,

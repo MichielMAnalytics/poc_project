@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import type {NativeStackNavigationProp, NativeStackScreenProps} from '@react-navigation/native-stack';
-import {useCampaigns, Popup, useInlineComponent, InlineComponent} from '../sdk';
+import {PipeGuru, Popup, InlineComponent, type InlineComponentProps} from '../sdk';
 
 type RootStackParamList = {
   Home: {username?: string};
@@ -29,10 +29,54 @@ type Props = {
 const HomeScreen: React.FC<Props> = ({navigation, route, username}) => {
   // Use route params if available (native app), otherwise use direct prop (web preview)
   const displayName = route?.params?.username || username || 'Guest';
-  // SDK Integration - Get campaigns for this screen
-  const {currentCampaign, dismissCampaign} = useCampaigns('Home');
-  // SDK Integration - Get inline component for this screen
-  const inlineComponentProps = useInlineComponent('Home');
+
+  // SDK Integration - Auto-updating inline component
+  const [inlineComponentProps, setInlineComponentProps] =
+    useState<InlineComponentProps | null>(() => {
+      const props = PipeGuru.getInlineComponent('Home');
+      console.log('[HomeScreen] Initial inline props:', props);
+      return props;
+    });
+
+  useEffect(() => {
+    console.log('[HomeScreen] Setting up inline component listener');
+    const handleUpdate = () => {
+      const props = PipeGuru.getInlineComponent('Home');
+      console.log('[HomeScreen] Updated inline props:', props);
+      setInlineComponentProps(props);
+    };
+    PipeGuru._on('campaigns_updated', handleUpdate);
+    return () => PipeGuru._off('campaigns_updated', handleUpdate);
+  }, []);
+
+  // SDK Integration - Auto-updating popup
+  const [currentPopup, setCurrentPopup] = useState(() => {
+    const popup = PipeGuru.getPopupCampaign('Home');
+    console.log('[HomeScreen] Initial popup:', popup);
+    return popup;
+  });
+
+  useEffect(() => {
+    console.log('[HomeScreen] Setting up popup listener');
+    const handleUpdate = () => {
+      const popup = PipeGuru.getPopupCampaign('Home');
+      console.log('[HomeScreen] Updated popup:', popup);
+      setCurrentPopup(popup);
+    };
+    PipeGuru._on('campaigns_updated', handleUpdate);
+    return () => PipeGuru._off('campaigns_updated', handleUpdate);
+  }, []);
+
+  const dismissPopup = () => {
+    setCurrentPopup(null);
+  };
+
+  console.log('[HomeScreen] Rendering with:', {
+    inlineComponentProps,
+    currentPopup,
+    willRenderPopup: !!currentPopup,
+    popupComponent: currentPopup ? 'YES' : 'NO'
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -67,17 +111,17 @@ const HomeScreen: React.FC<Props> = ({navigation, route, username}) => {
         </View>
       </View>
 
-      {/* SDK Popup - Automatically rendered based on campaign config */}
-      {currentCampaign && currentCampaign.component === 'Popup' && (
+      {/* SDK Popup - Auto-updates when campaigns change */}
+      {currentPopup && (
         <Popup
           visible={true}
-          title={currentCampaign.props.title}
-          message={currentCampaign.props.message}
-          primaryButton={currentCampaign.props.primaryButton}
-          secondaryButton={currentCampaign.props.secondaryButton}
-          onPrimaryPress={dismissCampaign}
-          onSecondaryPress={dismissCampaign}
-          onDismiss={dismissCampaign}
+          title={currentPopup.props.title}
+          message={currentPopup.props.message}
+          primaryButton={currentPopup.props.primaryButton}
+          secondaryButton={currentPopup.props.secondaryButton}
+          onPrimaryPress={dismissPopup}
+          onSecondaryPress={dismissPopup}
+          onDismiss={dismissPopup}
         />
       )}
     </SafeAreaView>
