@@ -33,40 +33,99 @@ import InlineComponent from './InlineComponent';
  *               - 'inline': Only inline components (rendered in content flow)
  *               - 'overlay': Only popups and permissions (rendered as overlays)
  *               - undefined: Render all types (default)
+ * @param campaignIds - Optional: Array of campaign IDs to show (only applies to inline type)
+ *                      If provided, only campaigns with these IDs will be rendered
  */
 interface CampaignRendererProps {
   screen: string;
   type?: 'inline' | 'overlay';
+  campaignIds?: string[];
 }
 
 export const CampaignRenderer: React.FC<CampaignRendererProps> = ({
   screen,
   type,
+  campaignIds,
 }) => {
   // Auto-fetch all campaign types for this screen
   const [popup, setPopup] = useState(() => PipeGuru.getPopupCampaign(screen));
   const [permission, setPermission] = useState(() =>
     PipeGuru.getPermissionPromptCampaign(screen),
   );
-  const [inline, setInline] = useState(() =>
-    PipeGuru.getInlineComponent(screen),
+  const [inlineComponents, setInlineComponents] = useState(() =>
+    PipeGuru.getInlineComponents(screen, campaignIds),
   );
+
+  // Track impressions when campaigns appear
+  useEffect(() => {
+    if (popup) {
+      PipeGuru.trackCampaignImpression(popup.id, 'Popup');
+    }
+  }, [popup]);
+
+  useEffect(() => {
+    if (permission) {
+      PipeGuru.trackCampaignImpression(permission.id, 'PermissionPrompt');
+    }
+  }, [permission]);
+
+  useEffect(() => {
+    inlineComponents.forEach(inline => {
+      PipeGuru.trackCampaignImpression(inline.id, 'InlineComponent');
+    });
+  }, [inlineComponents]);
 
   // Auto-update when campaigns change
   useEffect(() => {
     const handleUpdate = () => {
       setPopup(PipeGuru.getPopupCampaign(screen));
       setPermission(PipeGuru.getPermissionPromptCampaign(screen));
-      setInline(PipeGuru.getInlineComponent(screen));
+      setInlineComponents(PipeGuru.getInlineComponents(screen, campaignIds));
     };
 
     PipeGuru._on('campaigns_updated', handleUpdate);
     return () => PipeGuru._off('campaigns_updated', handleUpdate);
-  }, [screen]);
+  }, [screen, campaignIds]);
+
+  // Handler for dismissing campaigns with persistence
+  const handleDismissPopup = async (reason: string) => {
+    if (popup) {
+      await PipeGuru.dismissCampaign(popup.id, 'Popup', reason);
+      PipeGuru.trackCampaignAction(popup.id, 'Popup', reason);
+    }
+  };
+
+  const handleDismissPermission = async (reason: string) => {
+    if (permission) {
+      await PipeGuru.dismissCampaign(permission.id, 'PermissionPrompt', reason);
+      PipeGuru.trackCampaignAction(permission.id, 'PermissionPrompt', reason);
+    }
+  };
+
+  const handleDismissInline = async (campaignId: string) => {
+    await PipeGuru.dismissCampaign(campaignId, 'InlineComponent', 'close_button');
+  };
 
   // Render only inline components
   if (type === 'inline') {
-    return <>{inline && <InlineComponent {...inline} />}</>;
+    return (
+      <>
+        {inlineComponents.map(inline => (
+          <InlineComponent
+            key={inline.id}
+            {...inline}
+            onDismiss={
+              inline.onDismiss
+                ? () => {
+                    handleDismissInline(inline.id);
+                    inline.onDismiss?.();
+                  }
+                : undefined
+            }
+          />
+        ))}
+      </>
+    );
   }
 
   // Render only overlays (popups and permissions)
@@ -76,18 +135,33 @@ export const CampaignRenderer: React.FC<CampaignRendererProps> = ({
         {popup && (
           <Popup
             visible={true}
-            {...popup.props}
-            onPrimaryPress={() => setPopup(null)}
-            onSecondaryPress={() => setPopup(null)}
-            onDismiss={() => setPopup(null)}
+            title={popup.props.title}
+            message={popup.props.message}
+            primaryButton={popup.props.primaryButton}
+            secondaryButton={popup.props.secondaryButton}
+            onPrimaryPress={() => {
+              handleDismissPopup('primary_button');
+            }}
+            onSecondaryPress={() => {
+              handleDismissPopup('secondary_button');
+            }}
+            onDismiss={() => {
+              handleDismissPopup('backdrop');
+            }}
           />
         )}
 
         {permission && (
           <PermissionPrompt
             visible={true}
-            {...permission.props}
-            onDismiss={() => setPermission(null)}
+            permissionType={permission.props.permissionType}
+            title={permission.props.title}
+            message={permission.props.message}
+            allowButton={permission.props.allowButton}
+            denyButton={permission.props.denyButton}
+            onDismiss={() => {
+              handleDismissPermission('close_button');
+            }}
           />
         )}
       </>
@@ -97,17 +171,39 @@ export const CampaignRenderer: React.FC<CampaignRendererProps> = ({
   // Default: Render all types
   return (
     <>
-      {/* Inline component */}
-      {inline && <InlineComponent {...inline} />}
+      {/* Inline components */}
+      {inlineComponents.map(inline => (
+        <InlineComponent
+          key={inline.id}
+          {...inline}
+          onDismiss={
+            inline.onDismiss
+              ? () => {
+                  handleDismissInline(inline.id);
+                  inline.onDismiss?.();
+                }
+              : undefined
+          }
+        />
+      ))}
 
       {/* Popup */}
       {popup && (
         <Popup
           visible={true}
-          {...popup.props}
-          onPrimaryPress={() => setPopup(null)}
-          onSecondaryPress={() => setPopup(null)}
-          onDismiss={() => setPopup(null)}
+          title={popup.props.title}
+          message={popup.props.message}
+          primaryButton={popup.props.primaryButton}
+          secondaryButton={popup.props.secondaryButton}
+          onPrimaryPress={() => {
+            handleDismissPopup('primary_button');
+          }}
+          onSecondaryPress={() => {
+            handleDismissPopup('secondary_button');
+          }}
+          onDismiss={() => {
+            handleDismissPopup('backdrop');
+          }}
         />
       )}
 
@@ -115,8 +211,14 @@ export const CampaignRenderer: React.FC<CampaignRendererProps> = ({
       {permission && (
         <PermissionPrompt
           visible={true}
-          {...permission.props}
-          onDismiss={() => setPermission(null)}
+          permissionType={permission.props.permissionType}
+          title={permission.props.title}
+          message={permission.props.message}
+          allowButton={permission.props.allowButton}
+          denyButton={permission.props.denyButton}
+          onDismiss={() => {
+            handleDismissPermission('close_button');
+          }}
         />
       )}
     </>

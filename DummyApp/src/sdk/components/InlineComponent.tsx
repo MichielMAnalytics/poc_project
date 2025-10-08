@@ -29,6 +29,7 @@ export interface InlineComponentProps {
   secondaryButton?: InlineComponentButton;
   style?: InlineComponentStyle;
   alignment?: 'left' | 'center' | 'right';
+  onDismiss?: () => void;
 }
 
 /**
@@ -47,6 +48,7 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
   secondaryButton,
   style = {},
   alignment = 'left',
+  onDismiss,
 }) => {
   // Return null if no content is provided
   const hasContent = heading || body || caption || icon || button || secondaryButton;
@@ -75,6 +77,13 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
           alignItems,
         },
       ]}>
+      {/* Close button (if dismissible) */}
+      {onDismiss && (
+        <TouchableOpacity style={styles.closeButton} onPress={onDismiss}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Icon */}
       {icon && <Text style={styles.icon}>{icon}</Text>}
 
@@ -176,6 +185,19 @@ const InlineComponent: React.FC<InlineComponentProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 8,
+    zIndex: 10,
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '600',
   },
   icon: {
     fontSize: 40,

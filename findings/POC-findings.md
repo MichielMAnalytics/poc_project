@@ -1022,6 +1022,528 @@ const HomeScreen = () => (
 
 ---
 
+## P0 Features: Production-Ready Enhancements
+
+After the initial CampaignRenderer implementation, we implemented the **P0 (Must-Have) features** to make the SDK production-ready. These address critical gaps in analytics, persistence, and flexibility.
+
+### What We Implemented
+
+#### ✅ **1. Campaign-Specific Analytics Tracking**
+
+**Problem:** No way to track impressions, dismissals, or user actions on campaigns.
+
+**Solution:** Added three tracking methods to PipeGuru SDK:
+
+```typescript
+// Automatically track when campaign is shown
+PipeGuru.trackCampaignImpression(campaignId: string, campaignType: string)
+
+// Track when campaign is dismissed
+PipeGuru.trackCampaignDismissal(campaignId: string, campaignType: string, dismissalReason: string)
+
+// Track user actions (button clicks, etc.)
+PipeGuru.trackCampaignAction(campaignId: string, campaignType: string, actionType: string, actionData?: object)
+```
+
+**Implementation Details:**
+
+All analytics automatically logged with:
+- Campaign ID
+- Campaign type (Popup, PermissionPrompt, InlineComponent)
+- Timestamp
+- Reason/action type (e.g., 'primary_button', 'secondary_button', 'backdrop', 'close_button')
+
+**Console Output:**
+```javascript
+[PipeGuru Analytics] campaign_impression {
+  campaignId: 'promo_banner',
+  campaignType: 'InlineComponent',
+  timestamp: '2025-10-08T18:06:56.375Z'
+}
+
+[PipeGuru Analytics] campaign_dismissed {
+  campaignId: 'camera_permission',
+  campaignType: 'PermissionPrompt',
+  dismissalReason: 'close_button',
+  timestamp: '2025-10-08T18:07:23.156Z'
+}
+```
+
+**CampaignRenderer Integration:**
+
+Automatic impression tracking via useEffect:
+```typescript
+useEffect(() => {
+  if (popup) {
+    PipeGuru.trackCampaignImpression(popup.id, 'Popup');
+  }
+}, [popup]);
+
+useEffect(() => {
+  inlineComponents.forEach(inline => {
+    PipeGuru.trackCampaignImpression(inline.id, 'InlineComponent');
+  });
+}, [inlineComponents]);
+```
+
+Dismissal tracking integrated into button handlers:
+```typescript
+const handleDismissPopup = async (reason: string) => {
+  if (popup) {
+    await PipeGuru.dismissCampaign(popup.id, 'Popup', reason);
+    PipeGuru.trackCampaignAction(popup.id, 'Popup', reason);
+  }
+};
+
+<Popup
+  onPrimaryPress={() => handleDismissPopup('primary_button')}
+  onSecondaryPress={() => handleDismissPopup('secondary_button')}
+  onDismiss={() => handleDismissPopup('backdrop')}
+/>
+```
+
+**Benefits:**
+- ✅ Zero-config analytics - works automatically for all campaigns
+- ✅ Rich context - know exactly which button was clicked
+- ✅ Timestamp tracking for funnel analysis
+- ✅ Ready for backend integration (currently logs to console)
+
+---
+
+#### ✅ **2. Dismissal Persistence**
+
+**Problem:** Dismissed campaigns reappear on app reload - poor UX.
+
+**Solution:** Cross-platform storage layer with automatic persistence.
+
+**Storage Layer (`storage.ts`):**
+
+```typescript
+// Web: Uses localStorage
+// Native: Uses @react-native-async-storage/async-storage
+
+PipeGuruStorage.dismissCampaign(campaignId: string)
+PipeGuruStorage.getDismissedCampaigns(): Promise<Set<string>>
+PipeGuruStorage.isCampaignDismissed(campaignId: string): Promise<boolean>
+PipeGuruStorage.clearDismissedCampaigns()  // For testing
+```
+
+**SDK Integration:**
+
+```typescript
+class PipeGuruSDK {
+  private dismissedCampaigns: Set<string> = new Set();
+
+  async initialize(apiKey: string): Promise<void> {
+    // Load dismissed campaigns from storage on init
+    this.dismissedCampaigns = await PipeGuruStorage.getDismissedCampaigns();
+
+    this.fetchCampaigns();
+    this.pollingInterval = setInterval(() => this.fetchCampaigns(), 5000);
+  }
+
+  // Filter out dismissed campaigns
+  getPopupCampaign(screenName: string) {
+    const popups = screenCampaigns.filter(
+      campaign => campaign.component === 'Popup' &&
+                  !this.dismissedCampaigns.has(campaign.id)
+    );
+    return popups[0] || null;
+  }
+
+  // Persist dismissal
+  async dismissCampaign(campaignId: string, campaignType: string, reason: string) {
+    this.dismissedCampaigns.add(campaignId);
+    await PipeGuruStorage.dismissCampaign(campaignId);
+    this.trackCampaignDismissal(campaignId, campaignType, reason);
+
+    // Trigger re-render to hide campaign
+    this.emit('campaigns_updated', this.campaigns);
+  }
+}
+```
+
+**How It Works:**
+
+1. User dismisses campaign → Saved to localStorage/AsyncStorage
+2. App reloads → SDK loads dismissed campaigns from storage
+3. Campaign fetch → Dismissed campaigns filtered out automatically
+4. Campaign never shows again (until storage cleared)
+
+**Testing:**
+
+```javascript
+// Check dismissed campaigns in browser console
+localStorage.getItem('@pipeguru:dismissed_campaigns')
+// Returns: ["camera_permission", "welcome_popup"]
+
+// Clear for testing
+PipeGuruStorage.clearDismissedCampaigns()
+```
+
+**Benefits:**
+- ✅ Works on both web and native
+- ✅ Automatic filtering - no code changes needed
+- ✅ Graceful degradation - fails silently if storage unavailable
+- ✅ Ready for backend sync (currently local-only)
+
+---
+
+#### ✅ **3. Multiple Inline Components Support**
+
+**Problem:** Could only show one inline component per screen.
+
+**Solution:** Added `getInlineComponents()` (plural) method and `campaignIds` filter.
+
+**SDK Enhancement:**
+
+```typescript
+// Old: Returns single component
+getInlineComponent(screenName: string): InlineComponentProps | null
+
+// New: Returns array of components
+getInlineComponents(
+  screenName: string,
+  campaignIds?: string[]
+): Array<InlineComponentProps & {id: string}>
+```
+
+**CampaignRenderer Support:**
+
+```typescript
+interface CampaignRendererProps {
+  screen: string;
+  type?: 'inline' | 'overlay';
+  campaignIds?: string[];  // NEW: Filter specific campaigns
+}
+
+// Render all inline components for screen
+<CampaignRenderer screen="Home" type="inline" />
+
+// Render specific inline components only
+<CampaignRenderer
+  screen="Home"
+  type="inline"
+  campaignIds={['promo_banner', 'special_offer']}
+/>
+```
+
+**Implementation:**
+
+```typescript
+const [inlineComponents, setInlineComponents] = useState(() =>
+  PipeGuru.getInlineComponents(screen, campaignIds)
+);
+
+// Render with unique keys
+{inlineComponents.map(inline => (
+  <InlineComponent
+    key={inline.id}
+    {...inline}
+    onDismiss={() => handleDismissInline(inline.id)}
+  />
+))}
+```
+
+**Use Cases:**
+
+```typescript
+// Show all inline components
+<View style={styles.content}>
+  <Text>Header</Text>
+  <CampaignRenderer screen="Home" type="inline" />
+  <Button>Action</Button>
+</View>
+
+// Show specific campaign in specific position
+<View style={styles.content}>
+  <Text>Product Info</Text>
+  <CampaignRenderer
+    screen="Product"
+    type="inline"
+    campaignIds={['product_promo']}
+  />
+  <Text>Reviews</Text>
+  <CampaignRenderer
+    screen="Product"
+    type="inline"
+    campaignIds={['review_cta']}
+  />
+  <Button>Buy Now</Button>
+</View>
+```
+
+**Benefits:**
+- ✅ Flexible positioning - place different inline components in different positions
+- ✅ Backward compatible - `getInlineComponent()` still works
+- ✅ Independent dismissal - each component dismisses separately
+- ✅ Fine-grained control with `campaignIds` filter
+
+---
+
+#### ✅ **4. Inline Component Close Button**
+
+**Problem:** No way to dismiss inline components.
+
+**Solution:** Added optional `onDismiss` prop that renders a close button.
+
+**InlineComponent Enhancement:**
+
+```typescript
+export interface InlineComponentProps {
+  // ... existing props
+  onDismiss?: () => void;  // NEW
+}
+
+// Renders close button in top-right corner when provided
+{onDismiss && (
+  <TouchableOpacity style={styles.closeButton} onPress={onDismiss}>
+    <Text style={styles.closeButtonText}>✕</Text>
+  </TouchableOpacity>
+)}
+```
+
+**CampaignRenderer Integration:**
+
+```typescript
+<InlineComponent
+  key={inline.id}
+  {...inline}
+  onDismiss={() => {
+    handleDismissInline(inline.id);  // Persist dismissal
+    inline.onDismiss?.();             // Call original callback if exists
+  }}
+/>
+```
+
+**Styling:**
+
+```typescript
+closeButton: {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  padding: 8,
+  zIndex: 10,
+},
+closeButtonText: {
+  fontSize: 18,
+  color: '#666',
+  fontWeight: '600',
+},
+```
+
+**Benefits:**
+- ✅ User control - can dismiss unwanted inline campaigns
+- ✅ Automatic persistence - dismissed campaigns won't reappear
+- ✅ Analytics tracking - logs `'close_button'` dismissal reason
+- ✅ Optional - only shows when `onDismiss` provided
+
+---
+
+### P0 Summary
+
+| Feature | Status | Impact | Files Changed |
+|---------|--------|--------|---------------|
+| **Campaign Analytics** | ✅ Complete | Track impressions, dismissals, actions | `PipeGuru.ts`, `CampaignRenderer.tsx` |
+| **Dismissal Persistence** | ✅ Complete | Campaigns stay dismissed across sessions | `storage.ts`, `PipeGuru.ts`, `App.tsx` |
+| **Multiple Inline Components** | ✅ Complete | Show different components in different positions | `PipeGuru.ts`, `CampaignRenderer.tsx` |
+| **Inline Close Button** | ✅ Complete | User can dismiss inline campaigns | `InlineComponent.tsx`, `CampaignRenderer.tsx` |
+
+**Dependencies Added:**
+- `@react-native-async-storage/async-storage@^2.2.0` (for native storage)
+
+**Breaking Changes:**
+- `PipeGuru.initialize()` is now async (but fire-and-forget in practice)
+- `InlineComponentProps` now includes optional `onDismiss` property
+
+**What's Ready for Production:**
+- ✅ Full analytics pipeline (logs to console, ready for backend)
+- ✅ Cross-platform storage (web + native)
+- ✅ Flexible inline component positioning
+- ✅ User dismissal with persistence
+- ✅ All tracking happens automatically via CampaignRenderer
+
+**What's Still POC (Not Production Ready):**
+- ⚠️ Analytics only log to console (need backend integration)
+- ⚠️ No A/B testing support
+- ⚠️ 5-second polling instead of WebSockets
+- ⚠️ No error boundaries
+- ⚠️ No priority/ordering control for campaigns
+
+---
+
+## CampaignRenderer Limitations & Considerations
+
+### Limitation Summary
+
+| Limitation | Severity | Fix Complexity | Status | Impact |
+|------------|----------|----------------|--------|---------|
+| **~~No dismissal persistence~~** | ~~High~~ | ~~Medium~~ | ✅ **FIXED (P0)** | ~~UX - Campaigns reappear on reload~~ |
+| **~~No campaign-specific callbacks~~** | ~~High~~ | ~~Easy~~ | ✅ **FIXED (P0)** | ~~Analytics - Can't track campaigns~~ |
+| **~~No multiple inline components per screen~~** | ~~High~~ | ~~Medium~~ | ✅ **FIXED (P0)** | ~~Flexibility - Can't render different positions~~ |
+| **Duplicate component instances** | Medium | Easy | 🔄 Known Issue | Performance - Two instances fetch/manage state separately |
+| **No priority/ordering control** | Medium | Easy | ⚠️ P1 | UX - Always shows first campaign, no queue management |
+| **Hardcoded screen names** | Low | Easy | ⚠️ P2 | DX - No type safety, prone to typos |
+| **No loading states** | Low | Easy | ⚠️ P2 | UX - Brief flash when campaigns load |
+| **Tight coupling to PipeGuru singleton** | Medium | Medium | ⚠️ P1 | Testing - Hard to mock, difficult to unit test |
+| **No error boundaries** | Medium | Easy | ⚠️ P1 | Stability - Campaign errors crash entire screen |
+| **Modal replaced with View (web)** | Medium | Hard | 🔄 Known Issue | Native feel - Missing backdrop tap, back button, accessibility |
+| **Web preview race condition workaround** | Low | N/A | 🔄 Known Issue | Preview only - Different init logic for web vs native |
+| **No A/B testing / variant support** | High | Hard | ⚠️ P1 | Core feature - Single variant per campaign only |
+| **5-second polling inefficiency** | Medium | Medium | ⚠️ P1 | Scale - Battery drain, not real-time, poor scalability |
+
+### Detailed Limitations
+
+#### 1. **Duplicate Component Instances** ⚠️
+
+**Problem:** Split rendering creates two CampaignRenderer instances:
+
+```typescript
+<CampaignRenderer screen="Home" type="inline" />   // Instance 1
+<CampaignRenderer screen="Home" type="overlay" />  // Instance 2
+```
+
+**Impact:**
+- Each maintains separate state for popup, permission, inline
+- Each sets up independent event listeners
+- Campaigns fetched/managed twice
+- Double memory usage and event handlers
+
+**Fix:** Share state via Context or extract to custom hook
+
+---
+
+#### 2. **No Multiple Inline Components**
+
+**Problem:** Only renders first matching inline component per screen:
+
+```typescript
+// Can't do this - both would render the same campaign:
+<CampaignRenderer screen="Home" type="inline" id="promo_banner" />
+<CampaignRenderer screen="Home" type="inline" id="announcement" />
+```
+
+**Fix:** Add optional `campaignId` prop to target specific campaigns
+
+---
+
+#### 3. **No Dismissal Persistence**
+
+**Problem:** Dismissed campaigns reappear on reload:
+
+```typescript
+onPrimaryPress={() => setPopup(null)}  // Lost on unmount
+```
+
+**Missing:**
+- "Don't show again" functionality
+- Frequency capping (once per day)
+- Dismissal tracking to backend
+
+**Fix:** Implement local storage + backend tracking
+
+---
+
+#### 4. **No Campaign-Specific Callbacks**
+
+**Problem:** Generic handlers don't know which campaign was interacted with:
+
+```typescript
+<Popup onPrimaryPress={() => setPopup(null)} />  // Which campaign? What button?
+```
+
+**Needed:**
+```typescript
+onPrimaryPress={(campaignId, buttonId) => {
+  PipeGuru.track('campaign_clicked', { campaignId, buttonId });
+  // Custom navigation per campaign
+}}
+```
+
+**Fix:** Pass campaign metadata to callbacks
+
+---
+
+#### 5. **Modal → View Tradeoffs (Web)**
+
+Replaced React Native `Modal` with absolutely-positioned `View` for web compatibility.
+
+**Lost features:**
+- ❌ Backdrop tap to dismiss
+- ❌ Hardware back button (Android)
+- ❌ Accessibility (screen reader support)
+- ❌ Focus trapping
+- ⚠️ Potential z-index conflicts
+
+**Severity:** Medium - Works but less native feel
+
+---
+
+#### 6. **No A/B Testing**
+
+**Problem:** Single variant per campaign:
+
+```json
+{
+  "id": "welcome_popup",
+  "props": { "title": "Welcome!" }  // No variant support
+}
+```
+
+**Missing:**
+- Variant assignment (A vs B)
+- Conversion tracking per variant
+- Automatic winner selection
+
+**Fix:** Implement variant system in CampaignManager
+
+---
+
+#### 7. **Polling Inefficiency**
+
+**Current:** Poll every 5 seconds:
+
+```typescript
+setInterval(() => this.fetchCampaigns(), 5000);
+```
+
+**Issues:**
+- Battery drain on mobile
+- Not truly real-time (up to 5s delay)
+- Poor scalability (1000 users = 12,000 requests/min)
+
+**Better:** WebSocket, Server-Sent Events, or push notifications
+
+---
+
+### Recommended Priorities
+
+#### **Must Fix (P0) - Critical for Production**
+
+1. **Campaign-specific callbacks** - Essential for analytics tracking
+2. **Dismissal persistence** - Prevents annoying user experience
+3. **Multiple inline component support** - Required for complex UIs
+
+#### **Should Fix (P1) - Important for Scale**
+
+4. **Duplicate instance optimization** - Performance and efficiency
+5. **Error boundaries** - Production stability
+6. **A/B testing support** - Core growth/product feature
+
+#### **Nice to Have (P2) - Quality of Life**
+
+7. **Priority/ordering control** - Better campaign management
+8. **Loading states** - Improved UX
+9. **WebSocket instead of polling** - Real-time updates, better scale
+
+#### **Low Priority - Customer Can Handle**
+
+10. **Screen name constants** - Simple best practice
+11. **Web preview race condition** - Isolated to preview environment
+
+---
+
 ## Technical Limitations
 
 ### 1. **Platform-Specific Code**

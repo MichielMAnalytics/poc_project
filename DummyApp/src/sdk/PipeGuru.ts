@@ -1,5 +1,6 @@
 import {Campaign, loadCampaigns, getCampaignsForScreen} from './CampaignManager';
 import {InlineComponentProps} from './components/InlineComponent';
+import {PipeGuruStorage} from './storage';
 
 type EventListener = (...args: any[]) => void;
 
@@ -10,6 +11,7 @@ class PipeGuruSDK {
   private listeners: Map<string, EventListener[]> = new Map();
   private pollingInterval: any = null;
   private isInitialized: boolean = false;
+  private dismissedCampaigns: Set<string> = new Set();
 
   private constructor() {}
 
@@ -27,13 +29,16 @@ class PipeGuruSDK {
    * Initialize the SDK with your API key
    * @param apiKey Your PipeGuru API key
    */
-  initialize(apiKey: string): void {
+  async initialize(apiKey: string): Promise<void> {
     if (this.isInitialized) {
       return;
     }
 
     this.apiKey = apiKey;
     this.isInitialized = true;
+
+    // Load dismissed campaigns from storage
+    this.dismissedCampaigns = await PipeGuruStorage.getDismissedCampaigns();
 
     // Start fetching campaigns
     this.fetchCampaigns();
@@ -50,7 +55,62 @@ class PipeGuruSDK {
       return;
     }
 
+    console.log('[PipeGuru Analytics]', eventName, properties);
     // In production, this would send to your backend
+  }
+
+  /**
+   * Track campaign impression (when campaign is shown)
+   * @param campaignId The ID of the campaign
+   * @param campaignType The type of campaign (Popup, PermissionPrompt, InlineComponent)
+   */
+  trackCampaignImpression(campaignId: string, campaignType: string): void {
+    this.track('campaign_impression', {
+      campaignId,
+      campaignType,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Track campaign dismissal (when user closes/dismisses campaign)
+   * @param campaignId The ID of the campaign
+   * @param campaignType The type of campaign
+   * @param dismissalReason How it was dismissed (e.g., 'close_button', 'secondary_button', 'backdrop')
+   */
+  trackCampaignDismissal(
+    campaignId: string,
+    campaignType: string,
+    dismissalReason: string,
+  ): void {
+    this.track('campaign_dismissed', {
+      campaignId,
+      campaignType,
+      dismissalReason,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Track campaign action (when user takes action on campaign)
+   * @param campaignId The ID of the campaign
+   * @param campaignType The type of campaign
+   * @param actionType The type of action (e.g., 'primary_button', 'secondary_button', 'link_click')
+   * @param actionData Additional action data
+   */
+  trackCampaignAction(
+    campaignId: string,
+    campaignType: string,
+    actionType: string,
+    actionData?: Record<string, any>,
+  ): void {
+    this.track('campaign_action', {
+      campaignId,
+      campaignType,
+      actionType,
+      actionData,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   /**
@@ -74,10 +134,41 @@ class PipeGuruSDK {
     const screenCampaigns = getCampaignsForScreen(this.campaigns, screenName);
     const inlineComponents = screenCampaigns.filter(
       (campaign): campaign is Extract<Campaign, {component: 'InlineComponent'}> =>
-        campaign.component === 'InlineComponent',
+        campaign.component === 'InlineComponent' &&
+        !this.dismissedCampaigns.has(campaign.id),
     );
 
     return inlineComponents.length > 0 ? inlineComponents[0].props : null;
+  }
+
+  /**
+   * Get all inline components for a specific screen
+   * @param screenName The name of the screen
+   * @param campaignIds Optional array of campaign IDs to filter by
+   * @returns Array of inline component props
+   */
+  getInlineComponents(
+    screenName: string,
+    campaignIds?: string[],
+  ): Array<InlineComponentProps & {id: string}> {
+    const screenCampaigns = getCampaignsForScreen(this.campaigns, screenName);
+    let inlineComponents = screenCampaigns.filter(
+      (campaign): campaign is Extract<Campaign, {component: 'InlineComponent'}> =>
+        campaign.component === 'InlineComponent' &&
+        !this.dismissedCampaigns.has(campaign.id),
+    );
+
+    // Filter by specific campaign IDs if provided
+    if (campaignIds && campaignIds.length > 0) {
+      inlineComponents = inlineComponents.filter(campaign =>
+        campaignIds.includes(campaign.id),
+      );
+    }
+
+    return inlineComponents.map(campaign => ({
+      ...campaign.props,
+      id: campaign.id,
+    }));
   }
 
   /**
@@ -89,7 +180,7 @@ class PipeGuruSDK {
     const screenCampaigns = getCampaignsForScreen(this.campaigns, screenName);
     const popups = screenCampaigns.filter(
       (campaign): campaign is Extract<Campaign, {component: 'Popup'}> =>
-        campaign.component === 'Popup',
+        campaign.component === 'Popup' && !this.dismissedCampaigns.has(campaign.id),
     );
 
     return popups.length > 0 ? popups[0] : null;
@@ -104,10 +195,30 @@ class PipeGuruSDK {
     const screenCampaigns = getCampaignsForScreen(this.campaigns, screenName);
     const prompts = screenCampaigns.filter(
       (campaign): campaign is Extract<Campaign, {component: 'PermissionPrompt'}> =>
-        campaign.component === 'PermissionPrompt',
+        campaign.component === 'PermissionPrompt' &&
+        !this.dismissedCampaigns.has(campaign.id),
     );
 
     return prompts.length > 0 ? prompts[0] : null;
+  }
+
+  /**
+   * Dismiss a campaign (won't show again until storage cleared)
+   * @param campaignId The ID of the campaign to dismiss
+   * @param campaignType The type of campaign for analytics
+   * @param dismissalReason How it was dismissed
+   */
+  async dismissCampaign(
+    campaignId: string,
+    campaignType: string,
+    dismissalReason: string,
+  ): Promise<void> {
+    this.dismissedCampaigns.add(campaignId);
+    await PipeGuruStorage.dismissCampaign(campaignId);
+    this.trackCampaignDismissal(campaignId, campaignType, dismissalReason);
+
+    // Emit campaigns_updated to trigger re-render of components
+    this.emit('campaigns_updated', this.campaigns);
   }
 
   /**
